@@ -1,0 +1,135 @@
+---
+title: "2020-12-28-scRNAseq-tool-exploration"
+author: "Benjamin Decato"
+date: "12/28/2020"
+output: html_document
+---
+
+```{r setup, message=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = TRUE)
+
+# Data science libraries
+library(tidyverse)
+library(plotly)
+library(conflicted)
+conflict_prefer("filter", "dplyr", "stats")
+
+# scRNA-seq/bioinformatics libraries
+library(Seurat)
+library(SingleR)
+library(celldex)
+library(infercnv)
+library(genefu)
+
+```
+
+## Exploring single cell RNA-seq packages
+
+This is an RMarkdown for me to get familiar with several packages for the QC
+and downstream analysis of single cell RNA-seq packages. My goals here are to:
+
+ * Explore dimensionality reduction and automated cell type tagging with `Seurat`
+   and `singleR`.
+
+ * Infer copy number using `infercnv` and cluster cells using `hclust` for
+   subclone identification.
+   
+ * Try out `genefu`, a breast-cancer-specific R package.
+
+```{r readData}
+TNBC4 <- read.table("~/Downloads/GSE148673_RAW/GSM4476489_filtered_UMIcount_TNBC4.txt.gz", header=TRUE)
+
+TNBC4_Seurat <- CreateSeuratObject(TNBC4)
+
+```
+
+```{r seuratPreprocess}
+
+# Percentage of reads mapping to mitochondrial genome
+TNBC4_Seurat[["percent.mt"]] <- PercentageFeatureSet(TNBC4_Seurat, pattern = "^MT-")
+
+# Definitely more mitochondrial reads in cancer than the Seurat PBMC example.
+# They filter out >=5% mitochondrial counts: is this reasonable in cancer?
+# They also filter unique feature counts > 2500 or less than 200.. that's a lot
+# here too. How often are tons of unique features correlated with percent mt?
+VlnPlot(TNBC4_Seurat, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+        ncol = 3)
+
+# FeatureScatter is typically used to visualize feature-feature relationships, 
+# but can be used for anything calculated by the object, i.e. columns in object
+# metadata, PC scores etc.
+plot1 <- FeatureScatter(TNBC4_Seurat, feature1 = "nCount_RNA", 
+                        feature2 = "percent.mt")
+plot2 <- FeatureScatter(TNBC4_Seurat, feature1 = "nCount_RNA", 
+                        feature2 = "nFeature_RNA")
+plot1 + plot2
+
+# With the introduction of SCTransform, they no longer filter these,
+# but SCTransform only seems to regress out percent.mt. Wonder why?
+#TNBC4_Seurat <- subset(TNBC4_Seurat, subset = nFeature_RNA > 200 & 
+#                         nFeature_RNA < 2500 & percent.mt < 5)
+
+# Normalize and scale the data using the updated SCTransform method;
+# throws a lot of iteration limit warnings...
+TNBC4_Seurat <- SCTransform(TNBC4_Seurat, vars.to.regress = "percent.mt",
+                            verbose=FALSE)
+```
+
+```{r seuratCluster}
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(TNBC4_Seurat), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(TNBC4_Seurat)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+TNBC4_Seurat <- RunPCA(TNBC4_Seurat, dims = 1:30, verbose = FALSE)
+TNBC4_Seurat <- RunUMAP(TNBC4_Seurat, dims = 1:30, verbose = FALSE)
+TNBC4_Seurat <- FindNeighbors(TNBC4_Seurat, dims = 1:30, verbose = FALSE)
+TNBC4_Seurat <- FindClusters(TNBC4_Seurat, verbose = FALSE)
+
+DimPlot(TNBC4_Seurat, label = TRUE) + NoLegend()
+
+#DimHeatmap(TNBC4_Seurat, dims = 1, cells = 500, balanced = TRUE)
+
+# Very cool permutation-based PC selection technique
+#TNBC4_Seurat <- JackStraw(TNBC4_Seurat, num.replicate = 100)
+#TNBC4_Seurat <- ScoreJackStraw(TNBC4_Seurat, dims = 1:20)
+#JackStrawPlot(TNBC4_Seurat)
+ElbowPlot(TNBC4_Seurat)
+
+#cluster1.markers <- FindMarkers(TNBC4_Seurat, ident.1 = 1, min.pct = 0.25)
+#head(cluster1.markers, n = 5)
+
+#FeaturePlot(TNBC4_Seurat, features = c("EPCAM"))
+
+
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+TNBC4.markers <- FindAllMarkers(TNBC4_Seurat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+top10 <- TNBC4.markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+DoHeatmap(TNBC4_Seurat, features = top10$gene) + NoLegend()
+
+# Rename clusters based on traditional marker gene IDs
+#new.cluster.ids <- c("Naive CD4 T", "Memory CD4 T", "CD14+ Mono", "B", "CD8 T", "FCGR3A+ Mono", "NK", "DC", "Platelet")
+#names(new.cluster.ids) <- levels(pbmc)
+#pbmc <- RenameIdents(pbmc, new.cluster.ids)
+#DimPlot(pbmc, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+
+```
+
+```{r singleR}
+
+```
+
+
+
+
+
+
+
+
+
