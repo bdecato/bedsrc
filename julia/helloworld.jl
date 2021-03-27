@@ -7,7 +7,7 @@
 # @author Ben Decato
 ###############################################################################
 
-using Gadfly, RDatasets
+using Gadfly, RDatasets, DataFrames, Query
 
 println("Hello world")
 plot(y=[1,2,3])
@@ -29,6 +29,17 @@ end
 ps = get_to_it(iris)
 map(display, ps)
 
-plot(iris, x=:SepalLength, y=:SepalWidth, Geom.point, Geom.line)
-
 plot(iris, x=:SepalLength, y=:SepalWidth, color=:Species, Geom.point);
+
+### Query seems to be the main package for tidy-style data frame manipulation:
+
+df = DataFrame(name=["John", "Sally", "Kirk"], age=[23., 42., 59.], children=[3,5,2])
+
+# https://www.queryverse.org/Query.jl/stable/standalonequerycommands/
+
+x = df |>
+  @filter(_.age>50) |> # _.age>50 is anonymous function for i->i.age>50
+  @map({_.name, _.children}) |>
+  DataFrame
+
+println(x)
