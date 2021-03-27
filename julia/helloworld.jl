@@ -1,5 +1,5 @@
 ###############################################################################
-# helloworld.jl -- Messing around with Julia
+# helloworld.jl -- Messing around with Julia.
 #
 # Mostly following the very helpful Gadfly tutorial found here:
 # http://gadflyjl.org/stable/tutorial/#Tutorial
