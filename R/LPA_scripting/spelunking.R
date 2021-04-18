@@ -67,12 +67,20 @@ biomarkers_long <- biomarkers_long %>% left_join(baseline) %>%
   mutate(`CFB (ng/mL)` = Measurement - Baseline)
 
 summary <- biomarkers_long %>% 
-  na.omit() %>%
   group_by(Biomarker, Timepoint, TRTP) %>%
-  summarize(n = n(), median = median(Measurement))
+  summarize(median = median(Measurement)) %>%
+  spread(Timepoint, median) %>%
+  select(Treatment = TRTP, Biomarker, Baseline, `Week 4`, `Week 26`)
 
+summaryCFB <- biomarkers_long %>%
+  filter(Timepoint == "Week 26") %>%
+  group_by(Biomarker, TRTP) %>%
+  summarize(meanCFB = mean(`CFB (ng/mL)`)) %>%
+  spread(TRTP, meanCFB)
 
-
-
+write.table(summary, file = "eTable1-extension.txt", append = F, quote = F, 
+            sep = "\t", row.names = F)
+write.table(summaryCFB, file = "CFB_interpretation.txt", append = F, quote = F, 
+            sep = "\t", row.names = F)
 
 
