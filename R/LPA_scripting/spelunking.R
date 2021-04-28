@@ -1,6 +1,8 @@
 # 
-# spelunking.R -- tbh, just cleaning up really garbage spreadsheets from
-# collaborators to try and get something submittable.
+# spelunking.R -- tbh, just cleaning up really messy spreadsheets and trying
+# to get some clean summary statistics for paper revisions.
+#
+# Ben Decato
 #
 
 rm(list=ls())
@@ -9,6 +11,13 @@ library(tidyverse)
 library(readxl)
 
 setwd("~/Desktop/LPA Revisions/")
+
+# Set up my ggplot theme for use with all visualizations
+myTheme <- theme_bw() +
+  theme(text = element_text(size=16), axis.text = element_text(size = 14),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.background = element_blank(),
+        strip.placement = "outside")
 
 yi <- "IM136-003 Pivot table for all biomarkers for publication.xlsx"
 clinical <- yi %>% 
@@ -31,7 +40,6 @@ pc6 <- pc6 %>%
                                Timepoint == "Intensive D1 pre-dose" ~ "Baseline",
                                Timepoint == "W26 pre-dose" ~ "Week 26")) %>%
   mutate(Biomarker = "PRO-C6 ng/mL")
-
 
 biomarkers_smaller <- biomarkers %>%
   left_join(patientKey) %>%
@@ -68,15 +76,24 @@ biomarkers_long <- biomarkers_long %>% left_join(baseline) %>%
 
 summary <- biomarkers_long %>% 
   group_by(Biomarker, Timepoint, TRTP) %>%
-  summarize(median = median(Measurement)) %>%
-  spread(Timepoint, median) %>%
-  select(Treatment = TRTP, Biomarker, Baseline, `Week 4`, `Week 26`)
+  summarize(mean = mean(Measurement), se = sd(Measurement)/sqrt(n()), 
+            median = median(Measurement), sd = sd(Measurement)) #%>%
+  #spread(Timepoint, median) %>%
+  #select(Treatment = TRTP, Biomarker, Baseline, `Week 4`, `Week 26`)
 
 summaryCFB <- biomarkers_long %>%
   filter(Timepoint == "Week 26") %>%
   group_by(Biomarker, TRTP) %>%
-  summarize(meanCFB = mean(`CFB (ng/mL)`)) %>%
-  spread(TRTP, meanCFB)
+  summarize(meanCFB = mean(`CFB (ng/mL)`), seCFB = sd(`CFB (ng/mL)`)/sqrt(n()))
+
+pdf("meanCFB_week26.pdf",width=16, height=8)
+ggplot(summaryCFB, aes(x=TRTP, y=meanCFB)) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin=meanCFB-seCFB,ymax=meanCFB+seCFB), width = 0.2, position = position_dodge(0.9)) + 
+  facet_wrap(~Biomarker, ncol=9, scales = "free") + 
+  ylab("Week 26 mean CFB +/- SEM") + 
+  myTheme
+dev.off()
 
 write.table(summary, file = "eTable1-extension.txt", append = F, quote = F, 
             sep = "\t", row.names = F)
