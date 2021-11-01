@@ -70,7 +70,7 @@ baseline <- biomarkers_long %>%
   filter(Timepoint == "Baseline") %>% 
   select(SUBJID, Biomarker, Baseline = Measurement)
 
-biomarkers_long <- biomarkers_long %>% left_join(baseline) %>%
+test <- biomarkers_long %>% left_join(baseline) %>%
   na.omit() %>%
   mutate(`CFB (ng/mL)` = Measurement - Baseline)
 
