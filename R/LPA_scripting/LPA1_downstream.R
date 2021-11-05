@@ -9,6 +9,7 @@ rm(list=ls())
 
 library(tidyverse)
 library(readxl)
+library(broom)
 
 setwd("~/Desktop/LPA Revisions/")
 
@@ -70,7 +71,14 @@ baseline <- biomarkers_long %>%
   filter(Timepoint == "Baseline") %>% 
   select(SUBJID, Biomarker, Baseline = Measurement)
 
-test <- biomarkers_long %>% left_join(baseline) %>%
+## KW test for baseline differences
+kwTest <- baseline %>%
+  left_join(demographics) %>%
+  group_by(Biomarker) %>%
+  do(tidy(kruskal.test(x = .$Baseline, g = .$TRTP)))
+##
+
+biomarkers_long <- biomarkers_long %>% left_join(baseline) %>%
   na.omit() %>%
   mutate(`CFB (ng/mL)` = Measurement - Baseline)
 
@@ -100,4 +108,10 @@ write.table(summary, file = "eTable1-extension.txt", append = F, quote = F,
 write.table(summaryCFB, file = "CFB_interpretation.txt", append = F, quote = F, 
             sep = "\t", row.names = F)
 
+corBaselineCFB <- biomarkers_long %>% 
+  filter(Timepoint != "Baseline")
+ggplot(corBaselineCFB, aes(x=Baseline, y = `CFB (ng/mL)`, color = TRTP)) + 
+  geom_point() + 
+  facet_wrap(~Biomarker, ncol = 5, scales = "free") + 
+  myTheme
 
